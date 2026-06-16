@@ -2,7 +2,7 @@
   const floor8Map = {
     title: 'Karte 8. Stock',
     subtitle: 'Vereinfachte Übersicht für Station 14 und 15. Mit zwei Fingern zoomen und mit einem Finger verschieben.',
-    html: '<img class="mapImage" src="assets/floor8-map.svg" alt="8. Stock mit Route und Stationen 14 und 15">'
+    html: '<img class="mapImage" src="assets/floor8-map.png" alt="8. Stock mit Route und Stationen 14 und 15">'
   };
 
   window.getMap = getMap = function(floor) {
