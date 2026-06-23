@@ -1,15 +1,7 @@
-// TourPilot v2.3.1 fixes: station title + mobile scrolling
-const TOURPILOT_V2_3_1_ASSET = '20260623-v2-3-1';
+// TourPilot v2.3.2 fixes: station title only; no forced scroll loop
+const TOURPILOT_V2_3_2_ASSET = '20260623-v2-3-2';
 
-function tourPilotScrollTopV231() {
-  requestAnimationFrame(() => {
-    const screenEl = document.getElementById('screen');
-    if (screenEl && typeof screenEl.scrollTo === 'function') screenEl.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  });
-}
-
-function tourPilotCleanStationTitleV231() {
+function tourPilotCleanStationTitleV232() {
   requestAnimationFrame(() => {
     document.querySelectorAll('.stationHead h1').forEach(title => {
       title.textContent = title.textContent.replace(/^\s*Station\s+[^·]+·\s*/i, '').trim();
@@ -17,26 +9,36 @@ function tourPilotCleanStationTitleV231() {
   });
 }
 
-// Important: do NOT scroll on every DOM mutation. That prevented normal scrolling on mobile.
-if (!window.__tourPilotStationTitleObserverV231) {
-  window.__tourPilotStationTitleObserverV231 = true;
+function tourPilotAllowMobileScrollV232() {
+  document.documentElement.style.overflowY = 'auto';
+  document.body.style.overflowY = 'auto';
+  document.body.style.touchAction = 'auto';
+  const app = document.querySelector('.app');
+  const screen = document.getElementById('screen');
+  if (app) {
+    app.style.overflow = 'visible';
+    app.style.height = 'auto';
+    app.style.minHeight = '100dvh';
+  }
+  if (screen) {
+    screen.style.overflowY = 'visible';
+    screen.style.touchAction = 'pan-y';
+    screen.style.webkitOverflowScrolling = 'touch';
+  }
+}
+
+if (!window.__tourPilotStationTitleObserverV232) {
+  window.__tourPilotStationTitleObserverV232 = true;
   const target = document.getElementById('screen');
   if (target) {
     new MutationObserver(() => {
-      tourPilotCleanStationTitleV231();
+      tourPilotCleanStationTitleV232();
+      tourPilotAllowMobileScrollV232();
     }).observe(target, { childList: true, subtree: true });
   }
 }
 
-if (typeof render === 'function' && !window.__tourPilotRenderWrappedV231) {
-  const baseRenderV231 = render;
-  window.__tourPilotRenderWrappedV231 = true;
-  render = function () {
-    const result = baseRenderV231.apply(this, arguments);
-    tourPilotCleanStationTitleV231();
-    tourPilotScrollTopV231();
-    return result;
-  };
-}
-
-tourPilotCleanStationTitleV231();
+tourPilotCleanStationTitleV232();
+tourPilotAllowMobileScrollV232();
+setTimeout(tourPilotAllowMobileScrollV232, 300);
+setTimeout(tourPilotAllowMobileScrollV232, 1200);
