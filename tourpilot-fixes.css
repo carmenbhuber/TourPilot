@@ -1,1 +1,20 @@
-.brandLogo{display:block;width:244px;max-width:calc(100vw - 92px);height:auto}.topbar .brandLogo{width:290px}.mapImage{display:block;width:100%;height:auto}.mapSheet{max-height:94dvh}.mapSheetLarge{width:min(100%,860px);max-height:96dvh}.mapHint{font-size:12px;color:var(--muted);font-weight:800;padding:0 2px 6px}.mapViewport{position:relative;min-height:58vh;max-height:74dvh;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:#f6f6f6}.mapContent{position:relative;width:100%;transform-origin:center center}
+.brandLogo{display:block;width:290px;max-width:calc(100vw - 92px);height:auto}
+.photoHero{min-height:210px;background:#2A2641;padding:0;align-items:end}
+.photoHero:before,.photoHero:after{display:none}
+.photoHero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(1.05) contrast(1.02)}
+.photoHero:after{content:"";display:block;position:absolute;inset:0;background:linear-gradient(180deg,rgba(42,38,65,.05),rgba(42,38,65,.68))}
+.photoHero div{padding:18px;position:relative;z-index:1}
+.stationIcon{font-weight:950;font-size:18px}
+.sectionTitle{font-weight:950;color:var(--marine);letter-spacing:-.01em;margin-bottom:8px}
+.funfact p{margin:7px 0;line-height:1.38}
+.funfact p:first-of-type{font-weight:900;color:#60408c}
+.mapImage{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.mapSheet{max-height:94dvh}
+.mapSheetLarge{width:min(100%,860px);max-height:96dvh}
+.mapHeader p{margin:2px 0 0;color:var(--muted);font-size:13px;font-weight:800}
+.mapViewport{position:relative;min-height:58vh;max-height:74dvh;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:#f6f6f6;touch-action:none}
+.mapContent{position:relative;width:100%;transform-origin:center center;will-change:transform}
+.card .sectionTitle + .bullets{margin-top:8px}
+.row span{font-size:22px}
+.qtext{margin:8px 0}
+@media(min-width:760px){.photoHero{min-height:260px}.mapOverlay{align-items:center}}
