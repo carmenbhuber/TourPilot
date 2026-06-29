@@ -156,4 +156,30 @@ if (!window.__tourPilotV25Observer) {
   if (target) new MutationObserver(() => requestAnimationFrame(enhanceTourNavigationV25)).observe(target, { childList: true, subtree: true });
 }
 
+function api(action, params = {}) {
+  const activeUrl = 'https://script.google.com/macros/s/AKfycby8c-gyWLsty4cUd0sfx4prqT1xx71ASRhGSEJADBPNmvWwOCOBuI_SAROBTrIqZFvo/exec';
+  return new Promise((resolve, reject) => {
+    const callbackName = 'tp_' + Date.now() + Math.floor(Math.random() * 999);
+    const url = new URL(activeUrl);
+    url.searchParams.set('action', action);
+    url.searchParams.set('callback', callbackName);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : value));
+    const script = document.createElement('script');
+    const timer = setTimeout(() => cleanup(new Error('Timeout')), 12000);
+    window[callbackName] = payload => {
+      if (payload && payload.ok === false) cleanup(new Error(payload.error || 'API Fehler'));
+      else cleanup(null, payload || {});
+    };
+    script.onerror = () => cleanup(new Error('API Fehler'));
+    script.src = url.toString();
+    document.body.appendChild(script);
+    function cleanup(error, payload) {
+      clearTimeout(timer);
+      delete window[callbackName];
+      script.remove();
+      error ? reject(error) : resolve(payload);
+    }
+  });
+}
+
 requestAnimationFrame(enhanceTourNavigationV25);
