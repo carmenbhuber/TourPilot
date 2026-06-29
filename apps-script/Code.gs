@@ -1,10 +1,13 @@
-/** Neubau TourPilot – Google Apps Script Backend v2 */
+/** Neubau TourPilot – Google Apps Script Backend v3 */
 const SPREADSHEET_ID = '1yD5Mqnev2mAn-fZEBIedVdmd5m2-dqCwXzxe3UZBsPI';
 const SHEET_STATIONS = 'TourPilot_Stationen';
 const SHEET_TOURS = 'TourPilot_Touren';
 const SHEET_QUESTIONS = 'TourPilot_Fragen';
 
-function doGet(e) {
+function doGet(e) { return handle_(e); }
+function doPost(e) { return handle_(e); }
+
+function handle_(e) {
   const p = e && e.parameter ? e.parameter : {};
   const cb = p.callback || 'callback';
   let out;
@@ -14,16 +17,17 @@ function doGet(e) {
     else if (a === 'saveTour') out = { ok: true, tour: saveTour_(p) };
     else if (a === 'finishTour') out = { ok: true, tour: finishTour_(p) };
     else if (a === 'saveQuestion') out = { ok: true, question: saveQuestion_(p) };
-    else if (a === 'getQuestions') out = { ok: true, questions: getQuestions_(p.tourId) };
-    else out = { ok: true, message: 'TourPilot API v2 erreichbar.' };
+    else if (a === 'getQuestions') out = { ok: true, questions: getQuestions_(pick_(p, ['tourId', 'TourID'])) };
+    else if (a === 'debugHeaders') out = { ok: true, headers: debugHeaders_() };
+    else out = { ok: true, message: 'TourPilot API v3 erreichbar.', received: p };
   } catch (err) {
-    out = { ok: false, error: err.message || String(err) };
+    out = { ok: false, error: err.message || String(err), received: p };
   }
   return jsonp_(cb, out);
 }
 
 function jsonp_(cb, obj) {
-  const safe = String(cb).replace(/[^a-zA-Z0-9_.$]/g, '');
+  const safe = String(cb).replace(/[^a-zA-Z0-9_.$]/g, '') || 'callback';
   return ContentService
     .createTextOutput(`${safe}(${JSON.stringify(obj)});`)
     .setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -44,7 +48,6 @@ function getStations_() {
   const sh = sheet_(SHEET_STATIONS, ['Ablauf Rundgang', 'Geschoss', 'Station', 'Zugang über', 'Thema', 'Spezielles', 'Wegführung']);
   const values = sh.getDataRange().getValues();
   if (values.length < 2) return [];
-
   const headers = values[0].map(x => String(x).trim());
   const rows = values.slice(1).map(r => obj_(headers, r)).filter(hasAny_);
   return route_(rows);
@@ -52,7 +55,6 @@ function getStations_() {
 
 function route_(rows) {
   const stations = [];
-
   rows.forEach(r => {
     const nr = clean_(r['Ablauf Rundgang']);
     const floor = clean_(r['Geschoss']);
@@ -61,7 +63,6 @@ function route_(rows) {
     const topic = clean_(r['Thema']);
     const special = clean_(r['Spezielles']);
     const way = clean_(r['Wegführung']);
-
     if (nr !== '') {
       stations.push({
         order: nr,
@@ -75,8 +76,6 @@ function route_(rows) {
       });
       return;
     }
-
-    // Zwischenzeilen ohne Stationsnummer gehören zur vorherigen Station.
     if (!stations.length) return;
     const last = stations[stations.length - 1];
     if (access) last.access = append_(last.access, access, ' → ');
@@ -84,105 +83,96 @@ function route_(rows) {
     if (topic) last.topic = append_(last.topic, topic, '\n');
     if (special) last.special = append_(last.special, special, '\n');
   });
-
   stations.forEach((s, i) => {
     const next = stations[i + 1];
     s.nextStation = next ? (next.station || firstLine_(next.topic) || 'Nächste Station') : 'Tour abschliessen';
   });
-
   return stations;
 }
 
 function saveTour_(p) {
-  const headers = ['TourID', 'Datum', 'Guide', 'Status', 'ErstelltAm', 'AbgeschlossenAm', 'Teilnehmerzahl'];
-  const sh = sheet_(SHEET_TOURS, headers);
+  const required = ['TourID', 'Datum', 'Startzeit', 'Guide', 'Gruppe', 'Status', 'ErstelltAm', 'AbgeschlossenAm', 'Teilnehmerzahl'];
+  const sh = sheet_(SHEET_TOURS, required);
   const h = getHeaders_(sh);
-  const id = clean_(p.tourId || p.TourID);
+  const id = pick_(p, ['tourId', 'TourID', 'tourID']);
   if (!id) throw new Error('TourID fehlt.');
 
   const vals = sh.getDataRange().getValues();
   const tourIdCol = col_(h, 'TourID');
   const idx = find_(vals, tourIdCol, id);
-  const row = idx > -1 ? vals[idx].slice() : new Array(h.length).fill('');
+  const row = idx > -1 ? resizeRow_(vals[idx].slice(), h.length) : new Array(h.length).fill('');
 
   set_(row, h, 'TourID', id);
-  set_(row, h, 'Datum', clean_(p.date || p.Datum));
-  set_(row, h, 'Guide', clean_(p.guide || p.Guide));
-  set_(row, h, 'Status', clean_(p.status || p.Status || 'offen'));
-  set_(row, h, 'Teilnehmerzahl', clean_(p.participants || p.teilnehmerzahl || p['Teilnehmerzahl']));
+  set_(row, h, 'Datum', pick_(p, ['date', 'Datum']));
+  set_(row, h, 'Startzeit', pick_(p, ['startTime', 'Startzeit']));
+  set_(row, h, 'Guide', pick_(p, ['guide', 'Guide']));
+  set_(row, h, 'Gruppe', pick_(p, ['group', 'gruppe', 'Gruppe']));
+  set_(row, h, 'Status', pick_(p, ['status', 'Status']) || 'offen');
+  set_(row, h, 'Teilnehmerzahl', pick_(p, ['participants', 'participantCount', 'teilnehmerzahl', 'Teilnehmerzahl', 'AnzahlTeilnehmer', 'anzahlTeilnehmer', 'AnzTeilnehmer', 'anzTeilnehmer']));
   if (!get_(row, h, 'ErstelltAm')) set_(row, h, 'ErstelltAm', new Date());
-  set_(row, h, 'AbgeschlossenAm', get_(row, h, 'AbgeschlossenAm'));
+  if (!get_(row, h, 'AbgeschlossenAm')) set_(row, h, 'AbgeschlossenAm', '');
 
   if (idx > -1) sh.getRange(idx + 1, 1, 1, h.length).setValues([row]);
   else sh.appendRow(row);
-
   return obj_(h, row);
 }
 
 function finishTour_(p) {
-  const headers = ['TourID', 'Datum', 'Guide', 'Status', 'ErstelltAm', 'AbgeschlossenAm', 'Teilnehmerzahl'];
-  const sh = sheet_(SHEET_TOURS, headers);
+  const required = ['TourID', 'Datum', 'Startzeit', 'Guide', 'Gruppe', 'Status', 'ErstelltAm', 'AbgeschlossenAm', 'Teilnehmerzahl'];
+  const sh = sheet_(SHEET_TOURS, required);
   const h = getHeaders_(sh);
-  const id = clean_(p.tourId || p.TourID);
+  const id = pick_(p, ['tourId', 'TourID', 'tourID']);
   if (!id) throw new Error('TourID fehlt.');
 
   const vals = sh.getDataRange().getValues();
   const idx = find_(vals, col_(h, 'TourID'), id);
   const now = new Date();
+  const row = idx > -1 ? resizeRow_(vals[idx].slice(), h.length) : new Array(h.length).fill('');
+  set_(row, h, 'TourID', id);
+  set_(row, h, 'Datum', pick_(p, ['date', 'Datum']));
+  set_(row, h, 'Guide', pick_(p, ['guide', 'Guide']));
+  set_(row, h, 'Status', 'abgeschlossen');
+  if (!get_(row, h, 'ErstelltAm')) set_(row, h, 'ErstelltAm', now);
+  set_(row, h, 'AbgeschlossenAm', now);
+  const participants = pick_(p, ['participants', 'participantCount', 'teilnehmerzahl', 'Teilnehmerzahl', 'AnzahlTeilnehmer', 'anzahlTeilnehmer', 'AnzTeilnehmer', 'anzTeilnehmer']);
+  if (participants) set_(row, h, 'Teilnehmerzahl', participants);
 
-  if (idx > -1) {
-    const row = vals[idx].slice();
-    set_(row, h, 'Status', 'abgeschlossen');
-    set_(row, h, 'AbgeschlossenAm', now);
-    sh.getRange(idx + 1, 1, 1, h.length).setValues([row]);
-  } else {
-    const row = new Array(h.length).fill('');
-    set_(row, h, 'TourID', id);
-    set_(row, h, 'Datum', clean_(p.date || p.Datum));
-    set_(row, h, 'Guide', clean_(p.guide || p.Guide));
-    set_(row, h, 'Status', 'abgeschlossen');
-    set_(row, h, 'ErstelltAm', new Date());
-    set_(row, h, 'AbgeschlossenAm', now);
-    set_(row, h, 'Teilnehmerzahl', clean_(p.participants || p.teilnehmerzahl || p['Teilnehmerzahl']));
-    sh.appendRow(row);
-  }
-
-  return { TourID: id, Status: 'abgeschlossen', AbgeschlossenAm: now };
+  if (idx > -1) sh.getRange(idx + 1, 1, 1, h.length).setValues([row]);
+  else sh.appendRow(row);
+  return obj_(h, row);
 }
 
 function saveQuestion_(p) {
-  const headers = ['FrageID', 'TourID', 'StationNr', 'Station', 'Kategorie', 'Priorität', 'Frage', 'Fragesteller', 'Zuständig', 'Status', 'Antwort', 'ErstelltAm'];
-  const sh = sheet_(SHEET_QUESTIONS, headers);
+  const required = ['FrageID', 'TourID', 'StationNr', 'Station', 'Kategorie', 'Priorität', 'Frage', 'Zuständig', 'Status', 'Antwort', 'ErstelltAm', 'Fragesteller'];
+  const sh = sheet_(SHEET_QUESTIONS, required);
   const h = getHeaders_(sh);
-
   const row = new Array(h.length).fill('');
-  set_(row, h, 'FrageID', clean_(p.frageId || p.FrageID) || 'Q-' + Date.now());
-  set_(row, h, 'TourID', clean_(p.tourId || p.TourID));
-  set_(row, h, 'StationNr', clean_(p.stationNr || p.StationNr));
-  set_(row, h, 'Station', clean_(p.station || p.Station));
-  set_(row, h, 'Kategorie', clean_(p.category || p.Kategorie));
-  set_(row, h, 'Priorität', clean_(p.priority || p['Priorität']));
-  set_(row, h, 'Frage', clean_(p.question || p.Frage));
-  set_(row, h, 'Fragesteller', clean_(p.asker || p.fragesteller || p.Fragesteller));
-  set_(row, h, 'Zuständig', clean_(p.owner || p['Zuständig']));
-  set_(row, h, 'Status', clean_(p.status || p.Status) || 'offen');
-  set_(row, h, 'Antwort', clean_(p.answer || p.Antwort));
+
+  set_(row, h, 'FrageID', pick_(p, ['frageId', 'FrageID']) || 'Q-' + Date.now());
+  set_(row, h, 'TourID', pick_(p, ['tourId', 'TourID', 'tourID']));
+  set_(row, h, 'StationNr', pick_(p, ['stationNr', 'StationNr']));
+  set_(row, h, 'Station', pick_(p, ['station', 'Station']));
+  set_(row, h, 'Kategorie', pick_(p, ['category', 'Kategorie']));
+  set_(row, h, 'Priorität', pick_(p, ['priority', 'Priorität']));
+  set_(row, h, 'Frage', pick_(p, ['question', 'Frage']));
+  set_(row, h, 'Fragesteller', pick_(p, ['asker', 'fragesteller', 'Fragesteller', 'askedBy', 'Wer']));
+  set_(row, h, 'Zuständig', pick_(p, ['owner', 'Zuständig']));
+  set_(row, h, 'Status', pick_(p, ['status', 'Status']) || 'offen');
+  set_(row, h, 'Antwort', pick_(p, ['answer', 'Antwort']));
   set_(row, h, 'ErstelltAm', new Date());
 
   if (!get_(row, h, 'TourID')) throw new Error('TourID fehlt.');
   if (!get_(row, h, 'Frage')) throw new Error('Frage fehlt.');
-
   sh.appendRow(row);
   return obj_(h, row);
 }
 
 function getQuestions_(tourId) {
-  const headers = ['FrageID', 'TourID', 'StationNr', 'Station', 'Kategorie', 'Priorität', 'Frage', 'Fragesteller', 'Zuständig', 'Status', 'Antwort', 'ErstelltAm'];
-  const sh = sheet_(SHEET_QUESTIONS, headers);
+  const required = ['FrageID', 'TourID', 'StationNr', 'Station', 'Kategorie', 'Priorität', 'Frage', 'Zuständig', 'Status', 'Antwort', 'ErstelltAm', 'Fragesteller'];
+  const sh = sheet_(SHEET_QUESTIONS, required);
   const v = sh.getDataRange().getValues();
   if (v.length < 2) return [];
-  const h = v[0].map(x => String(x).trim());
-
+  const h = getHeaders_(sh);
   return v.slice(1)
     .map(r => obj_(h, r))
     .filter(r => !tourId || clean_(r.TourID) === clean_(tourId))
@@ -204,6 +194,13 @@ function getQuestions_(tourId) {
     .reverse();
 }
 
+function debugHeaders_() {
+  return {
+    TourPilot_Touren: getHeaders_(sheet_(SHEET_TOURS, ['TourID', 'Datum', 'Startzeit', 'Guide', 'Gruppe', 'Status', 'ErstelltAm', 'AbgeschlossenAm', 'Teilnehmerzahl'])),
+    TourPilot_Fragen: getHeaders_(sheet_(SHEET_QUESTIONS, ['FrageID', 'TourID', 'StationNr', 'Station', 'Kategorie', 'Priorität', 'Frage', 'Zuständig', 'Status', 'Antwort', 'ErstelltAm', 'Fragesteller']))
+  };
+}
+
 function getHeaders_(sh) {
   return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim());
 }
@@ -219,6 +216,15 @@ function ensureColumns_(sh, required) {
   sh.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]);
 }
 
+function pick_(p, names) {
+  for (let i = 0; i < names.length; i++) {
+    const val = clean_(p[names[i]]);
+    if (val !== '') return val;
+  }
+  return '';
+}
+
+function resizeRow_(row, length) { while (row.length < length) row.push(''); return row.slice(0, length); }
 function obj_(h, r) { const o = {}; h.forEach((x, i) => o[x] = r[i]); return o; }
 function hasAny_(r) { return Object.keys(r).some(k => clean_(r[k]) !== ''); }
 function clean_(v) { if (v === null || v === undefined) return ''; if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'); return String(v).replace(/\r/g, '').trim(); }
