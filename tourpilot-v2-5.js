@@ -1,5 +1,9 @@
 // TourPilot v2.5: Direktsprung + automatische Stockwerk-Intro-Slide
-const TOURPILOT_V2_5_ASSET = '20260623-v2-5-1';
+const TOURPILOT_V2_5_ASSET = '20260629-show-all-lines';
+
+function list(text, max = 99) {
+  return String(text || '').split('\n').map(item => item.trim()).filter(Boolean).slice(0, max);
+}
 
 function floorLabelV25(floor) {
   const key = String(floor ?? '').trim().toUpperCase();
