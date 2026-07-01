@@ -1,5 +1,5 @@
 // TourPilot v2.5: Direktsprung + automatische Stockwerk-Intro-Slide + Offline-Speicher
-const TOURPILOT_V2_5_ASSET = '20260629-pwa-offline';
+const TOURPILOT_V2_5_ASSET = '20260629-pwa-offline-refresh';
 const TP_CACHE_STATIONS = 'tourpilot_cached_stations_v1';
 const TP_CACHE_DATE = 'tourpilot_cached_stations_date_v1';
 const TP_QUEUE = 'tourpilot_sync_queue_v1';
@@ -90,8 +90,10 @@ function addOfflineCardV25() {
   const onlineText = navigator.onLine ? 'Online' : 'Offline';
   const cacheText = cachedDate ? `Route lokal gespeichert: ${cachedDate}` : 'Route wird beim ersten Online-Öffnen lokal gespeichert.';
   const queueText = queue.length ? `${queue.length} Eintrag/Einträge warten auf Synchronisierung.` : 'Keine offenen Offline-Einträge.';
-  card.innerHTML = `<div class="split"><strong>${onlineText}-Modus</strong><span class="pill">PWA</span></div><p class="small">${esc(cacheText)}<br>${esc(queueText)}</p>${queue.length ? '<button id="syncOfflineV25" class="btn ghost">Jetzt synchronisieren</button>' : ''}`;
+  card.innerHTML = `<div class="split"><strong>${onlineText}-Modus</strong><span class="pill">PWA</span></div><p class="small">${esc(cacheText)}<br>${esc(queueText)}</p><div class="twocol"><button id="refreshRouteV25" class="btn primary">Route aktualisieren</button>${queue.length ? '<button id="syncOfflineV25" class="btn ghost">Jetzt synchronisieren</button>' : ''}</div>`;
   grid.prepend(card);
+  const refreshButton = card.querySelector('#refreshRouteV25');
+  if (refreshButton) refreshButton.onclick = refreshRouteV25;
   const syncButton = card.querySelector('#syncOfflineV25');
   if (syncButton) syncButton.onclick = syncOfflineV25;
 }
@@ -158,6 +160,23 @@ async function api(action, params = {}) {
       return { ok: true, queued: true };
     }
     throw error;
+  }
+}
+
+async function refreshRouteV25() {
+  if (!navigator.onLine) return msg('Offline – Route kann gerade nicht aktualisiert werden.');
+  const button = document.getElementById('refreshRouteV25');
+  if (button) { button.disabled = true; button.textContent = 'Aktualisiere...'; }
+  try {
+    const response = await apiNetworkV25('getStations');
+    if (!response.stations || !response.stations.length) throw new Error('Keine Stationen erhalten.');
+    state.stations = response.stations;
+    tpCacheStationsV25(response.stations);
+    msg(`Route aktualisiert · ${response.stations.length} Stationen gespeichert.`);
+    render();
+  } catch (error) {
+    msg('Route konnte nicht aktualisiert werden.');
+    if (button) { button.disabled = false; button.textContent = 'Route aktualisieren'; }
   }
 }
 
