@@ -1,0 +1,19 @@
+{
+  "name": "Neubau TourPilot",
+  "short_name": "TourPilot",
+  "description": "Mobiler Guide für OKS Neubau-Rundgänge",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#2A2641",
+  "theme_color": "#2A2641",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/tourpilot-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
